@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from datetime import datetime
 import json
 import logging
@@ -27,6 +33,8 @@ class DruidColumnInlineView(CompactCRUDMixin, SupersetModelView):  # noqa
     show_title = _('Show Druid Column')
     add_title = _('Add Druid Column')
     edit_title = _('Edit Druid Column')
+
+    list_widget = ListWidgetWithCheckboxes
 
     edit_columns = [
         'column_name', 'description', 'dimension_spec_json', 'datasource',
@@ -197,7 +205,6 @@ class DruidDatasourceModelView(DatasourceModelView, DeleteMixin, YamlExportMixin
     add_title = _('Add Druid Datasource')
     edit_title = _('Edit Druid Datasource')
 
-    list_widget = ListWidgetWithCheckboxes
     list_columns = [
         'datasource_link', 'cluster', 'changed_by_', 'modified']
     order_columns = ['datasource_link', 'modified']

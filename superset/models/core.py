@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """A collection of ORM sqlalchemy models for Superset"""
 from __future__ import absolute_import
 from __future__ import division
@@ -200,25 +201,30 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
         form_data.update({
             'slice_id': self.id,
             'viz_type': self.viz_type,
-            'datasource': str(self.datasource_id) + '__' + self.datasource_type,
+            'datasource': '{}__{}'.format(
+                self.datasource_id, self.datasource_type),
         })
         if self.cache_timeout:
             form_data['cache_timeout'] = self.cache_timeout
         return form_data
 
+    def get_explore_url(self, base_url='/superset/explore', overrides=None):
+        overrides = overrides or {}
+        form_data = {'slice_id': self.id}
+        form_data.update(overrides)
+        params = parse.quote(json.dumps(form_data))
+        return (
+            '{base_url}/?form_data={params}'.format(**locals()))
+
     @property
     def slice_url(self):
         """Defines the url to access the slice"""
-        return (
-            '/superset/explore/{obj.datasource_type}/'
-            '{obj.datasource_id}/?form_data={params}'.format(
-                obj=self, params=parse.quote(json.dumps(self.form_data))))
+        return self.get_explore_url()
 
     @property
-    def slice_id_url(self):
-        return (
-            '/superset/{slc.datasource_type}/{slc.datasource_id}/{slc.id}/'
-        ).format(slc=self)
+    def explore_json_url(self):
+        """Defines the url to access the slice"""
+        return self.get_explore_url('/superset/explore_json')
 
     @property
     def edit_url(self):
@@ -230,7 +236,7 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
         name = escape(self.slice_name)
         return Markup('<a href="{url}">{name}</a>'.format(**locals()))
 
-    def get_viz(self):
+    def get_viz(self, force=False):
         """Creates :py:class:viz.BaseViz object from the url_params_multidict.
 
         :return: object of the 'viz_type' type that is taken from the
@@ -246,6 +252,7 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
         return viz_types[slice_params.get('viz_type')](
             self.datasource,
             form_data=slice_params,
+            force=force,
         )
 
     @classmethod
@@ -638,7 +645,7 @@ class Database(Model, AuditMixinNullable, ImportMixin):
 
     @utils.memoized(
         watch=('impersonate_user', 'sqlalchemy_uri_decrypted', 'extra'))
-    def get_sqla_engine(self, schema=None, nullpool=False, user_name=None):
+    def get_sqla_engine(self, schema=None, nullpool=True, user_name=None):
         extra = self.get_extra()
         url = make_url(self.sqlalchemy_uri_decrypted)
         url = self.db_engine_spec.adjust_database_uri(url, schema)
@@ -859,9 +866,10 @@ class Log(Model):
             user_id = None
             if g.user:
                 user_id = g.user.get_id()
-            d = request.args.to_dict()
-            post_data = request.form.to_dict() or {}
-            d.update(post_data)
+            d = request.form.to_dict() or {}
+            # request parameters can overwrite post body
+            request_params = request.args.to_dict()
+            d.update(request_params)
             d.update(kwargs)
             slice_id = d.get('slice_id')
 

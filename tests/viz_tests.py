@@ -1,10 +1,15 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from datetime import datetime
 import unittest
 
 from mock import Mock, patch
 import pandas as pd
 
-import superset.utils as utils
 from superset.utils import DTTM_ALIAS
 import superset.viz as viz
 
@@ -47,8 +52,6 @@ class BaseVizTestCase(unittest.TestCase):
         result = test_viz.get_df(query_obj)
         self.assertEqual(type(result), pd.DataFrame)
         self.assertTrue(result.empty)
-        self.assertEqual(test_viz.error_message, 'No data.')
-        self.assertEqual(test_viz.status, utils.QueryStatus.FAILED)
 
     def test_get_df_handles_dttm_col(self):
         datasource = Mock()
@@ -101,11 +104,8 @@ class BaseVizTestCase(unittest.TestCase):
 
     def test_cache_timeout(self):
         datasource = Mock()
-        form_data = {'cache_timeout': '10'}
-        test_viz = viz.BaseViz(datasource, form_data)
-        self.assertEqual(10, test_viz.cache_timeout)
-        del form_data['cache_timeout']
         datasource.cache_timeout = 156
+        test_viz = viz.BaseViz(datasource, form_data={})
         self.assertEqual(156, test_viz.cache_timeout)
         datasource.cache_timeout = None
         datasource.database = Mock()
@@ -594,3 +594,43 @@ class PartitionVizTestCase(unittest.TestCase):
         test_viz.get_data(df)
         self.assertEqual('agg_sum', test_viz.levels_for.mock_calls[3][1][0])
         self.assertEqual(7, len(test_viz.nest_values.mock_calls))
+
+
+class RoseVisTestCase(unittest.TestCase):
+
+    def test_rose_vis_get_data(self):
+        raw = {}
+        t1 = pd.Timestamp('2000')
+        t2 = pd.Timestamp('2002')
+        t3 = pd.Timestamp('2004')
+        raw[DTTM_ALIAS] = [t1, t2, t3, t1, t2, t3, t1, t2, t3]
+        raw['groupA'] = ['a1', 'a1', 'a1', 'b1', 'b1', 'b1', 'c1', 'c1', 'c1']
+        raw['groupB'] = ['a2', 'a2', 'a2', 'b2', 'b2', 'b2', 'c2', 'c2', 'c2']
+        raw['groupC'] = ['a3', 'a3', 'a3', 'b3', 'b3', 'b3', 'c3', 'c3', 'c3']
+        raw['metric1'] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        df = pd.DataFrame(raw)
+        fd = {
+            'metrics': ['metric1'],
+            'groupby': ['groupA'],
+        }
+        test_viz = viz.RoseViz(Mock(), fd)
+        test_viz.metrics = fd['metrics']
+        res = test_viz.get_data(df)
+        expected = {
+            946684800000000000: [
+                {'time': t1, 'value': 1, 'key': ('a1',), 'name': ('a1',)},
+                {'time': t1, 'value': 4, 'key': ('b1',), 'name': ('b1',)},
+                {'time': t1, 'value': 7, 'key': ('c1',), 'name': ('c1',)},
+            ],
+            1009843200000000000: [
+                {'time': t2, 'value': 2, 'key': ('a1',), 'name': ('a1',)},
+                {'time': t2, 'value': 5, 'key': ('b1',), 'name': ('b1',)},
+                {'time': t2, 'value': 8, 'key': ('c1',), 'name': ('c1',)},
+            ],
+            1072915200000000000: [
+                {'time': t3, 'value': 3, 'key': ('a1',), 'name': ('a1',)},
+                {'time': t3, 'value': 6, 'key': ('b1',), 'name': ('b1',)},
+                {'time': t3, 'value': 9, 'key': ('c1',), 'name': ('c1',)},
+            ],
+        }
+        self.assertEqual(expected, res)

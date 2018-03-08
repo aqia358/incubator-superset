@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import json
 
 from sqlalchemy import (
@@ -114,6 +120,13 @@ class BaseDatasource(AuditMixinNullable, ImportMixin):
             for m in self.metrics
             if m.d3format
         }
+
+    def add_missing_metrics(self, metrics):
+        exisiting_metrics = {m.metric_name for m in self.metrics}
+        for metric in metrics:
+            if metric.metric_name not in exisiting_metrics:
+                metric.table_id = self.id
+                self.metrics += [metric]
 
     @property
     def metrics_combo(self):
