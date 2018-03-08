@@ -48,7 +48,10 @@ logging.getLogger('MARKDOWN').setLevel(logging.INFO)
 PY3K = sys.version_info >= (3, 0)
 EPOCH = datetime(1970, 1, 1)
 DTTM_ALIAS = '__timestamp'
-
+from dateutil import tz
+LOCAL_TZ = tz.tzlocal()
+QUERY_TZ = tz.tzlocal()
+DATA_TZ = tz.tzutc()
 
 class SupersetException(Exception):
     pass
@@ -225,11 +228,15 @@ def parse_human_datetime(s):
     except Exception:
         try:
             cal = parsedatetime.Calendar()
-            parsed_dttm, parsed_flags = cal.parseDT(s)
+            parsed_dttm, parsed_flags = cal.parseDT(datetimeString=s)
+
+            dttm = dttm_from_timtuple(parsed_dttm.utctimetuple())
+            dttm = dttm.replace(tzinfo=LOCAL_TZ)
             # when time is not extracted, we 'reset to midnight'
             if parsed_flags & 2 == 0:
-                parsed_dttm = parsed_dttm.replace(hour=0, minute=0, second=0)
-            dttm = dttm_from_timtuple(parsed_dttm.utctimetuple())
+                dttm = dttm.astimezone(QUERY_TZ)
+                dttm = dttm.replace(hour=0, minute=0, second=0, microsecond=0)
+            dttm = dttm.astimezone(DATA_TZ)
         except Exception as e:
             logging.exception(e)
             raise ValueError("Couldn't parse date string [{}]".format(s))
